@@ -1,0 +1,160 @@
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>Ducks Drop</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:radial-gradient(circle at 50% 40%,#18233c,#080d19 75%);
+ color:white;font-family:Arial,sans-serif;
+ min-height:100vh;text-align:center;
+ display:flex;flex-direction:column;
+}
+header{padding:25px 15px}
+.balance{
+ display:inline-flex;align-items:center;gap:12px;
+ padding:15px 28px;border-radius:50px;
+ background:#263149;border:1px solid #414b62;
+ font-size:23px;font-weight:bold;
+}
+.star{color:#ffd52c;font-size:30px}
+h1{font-size:28px;margin-top:35px}
+.subtitle{color:#8998b4;font-size:19px}
+.duck-area{
+ flex:1;display:flex;align-items:center;
+ justify-content:center;min-height:300px;
+}
+.duck{width:270px;max-width:80%;filter:drop-shadow(0 0 25px #e6a90033)}
+button{
+ border:0;cursor:pointer;font-weight:bold;
+}
+.hit{
+ margin:15px 8%;padding:23px;
+ border-radius:28px;font-size:28px;
+ color:#543000;
+ background:linear-gradient(#ffe56d,#ffad13);
+ box-shadow:0 8px 0 #b96a00,0 0 25px #ffbd2455;
+}
+.hit:active{transform:translateY(5px);box-shadow:0 3px 0 #b96a00}
+.hint{color:#8290aa;margin:15px 0 35px}
+.modal{
+ display:none;position:fixed;inset:0;
+ background:#000b;align-items:flex-end;
+ z-index:5;
+}
+.panel{
+ background:#202020;width:100%;
+ border-radius:28px 28px 0 0;padding:35px 22px;
+}
+.panel h2{font-size:25px}
+.panel p{font-size:18px;line-height:1.5}
+.pay{
+ background:#527df2;color:white;width:100%;
+ padding:18px;border-radius:12px;font-size:18px;
+}
+.cancel{background:none;color:#aaa;padding:18px;font-size:16px}
+</style>
+</head>
+<body>
+<header>
+ <div class="balance">
+  <span class="star">★</span>
+  <span id="balance">0</span>
+  <small>зірок</small>
+ </div>
+</header>
+
+<h1>Твій перший бос, ударь його!</h1>
+<div class="subtitle">Кожен удар приносить зірки</div>
+
+<div class="duck-area">
+<svg class="duck" viewBox="0 0 300 330">
+ <ellipse cx="150" cy="300" rx="100" ry="12" fill="#0008"/>
+ <path d="M50 180 C35 90 75 25 150 25 C235 25 270 100 250 185 L265 255 Q260 300 150 300 Q40 300 35 255Z" fill="#ffcf27" stroke="#f59a08" stroke-width="8"/>
+ <ellipse cx="102" cy="125" rx="20" ry="25" fill="#080808"/>
+ <ellipse cx="190" cy="125" rx="20" ry="25" fill="#080808"/>
+ <circle cx="109" cy="116" r="7" fill="white"/>
+ <circle cx="197" cy="116" r="7" fill="white"/>
+ <path d="M120 157 Q150 135 180 157 Q170 185 150 183 Q130 185 120 157" fill="#ed5427" stroke="#b83213" stroke-width="5"/>
+ <path d="M70 210 Q15 180 15 215 L55 245 Q5 245 30 270 L85 250" fill="#ffb900" stroke="#ed9700" stroke-width="6"/>
+ <path d="M220 210 Q285 175 280 220 L240 245 Q290 245 265 270 L215 250" fill="#ffb900" stroke="#ed9700" stroke-width="6"/>
+ <path d="M125 205 L120 240 M175 205 L180 240" stroke="#ed9a00" stroke-width="7" stroke-linecap="round"/>
+ <text x="150" y="225" font-size="28" text-anchor="middle" fill="white">★</text>
+ <text x="150" y="250" font-size="23" text-anchor="middle" fill="white">★</text>
+</svg>
+</div>
+
+<button class="hit" id="hit">БЕЙ</button>
+<div class="hint">Чим швидше б'єш, тим зліше бос</div>
+
+<div class="modal" id="modal">
+ <div class="panel">
+  <div style="font-size:65px">⭐</div>
+  <h2>Підтвердити покупку</h2>
+  <p>Хочеш купити наступний удар по босу за 15 Telegram Stars?</p>
+  <button class="pay" id="pay">Підтвердити та оплатити ⭐ 15</button>
+  <button class="cancel" id="cancel">Скасувати</button>
+ </div>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+let balance = 0;
+let taps = [];
+let purchaseShown = false;
+
+const balanceEl = document.getElementById('balance');
+const modal = document.getElementById('modal');
+
+document.getElementById('hit').onclick = () => {
+ balance += 5;
+ balanceEl.textContent = balance;
+
+ const now = Date.now();
+ taps = taps.filter(t => now-t < 5000);
+ taps.push(now);
+
+ if(taps.length >= 15 && !purchaseShown){
+   purchaseShown = true;
+   modal.style.display = 'flex';
+ }
+};
+
+document.getElementById('cancel').onclick = () => {
+ modal.style.display = 'none';
+ purchaseShown = false;
+ taps = [];
+};
+
+document.getElementById('pay').onclick = async () => {
+ try {
+   const response = await fetch('/api/create-invoice',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({product:'boss_hit'})
+   });
+   if(!response.ok) throw new Error('Invoice unavailable');
+   const data = await response.json();
+   if(!data.url) throw new Error('No invoice URL');
+
+   tg.openInvoice(data.url, status => {
+     if(status === 'paid'){
+       alert('Оплата успішна!');
+     }
+   });
+   modal.style.display = 'none';
+ } catch(e) {
+   alert('Оплата ще не підключена. Ми налаштуємо її окремо.');
+ }
+};
+</script>
+</body>
+  </html>
+    
